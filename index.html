@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Complex Zelda-like Adventure Game</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #222;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+            margin: 0 auto;
+            background-color: #87CEEB;
+            image-rendering: pixelated;
+        }
+
+        #controls {
+            position: absolute;
+            bottom: 10px;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: center;
+        }
+
+        .button {
+            width: 50px;
+            height: 50px;
+            margin: 5px;
+            background-color: rgba(0,0,0,0.6);
+            border-radius: 50%;
+            color: white;
+            font-size: 20px;
+            text-align: center;
+            line-height: 50px;
+        }
+
+        .button:active {
+            background-color: rgba(255, 255, 255, 0.8);
+        }
+
+        #gameInfo {
+            text-align: center;
+            color: white;
+            padding: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="gameInfo">
+        <h1>Complex Adventure Game</h1>
+        <p>Use the touch buttons or arrow keys to move</p>
+    </div>
+
+    <canvas id="gameCanvas" width="600" height="400"></canvas>
+
+    <!-- On-screen controls for touch devices -->
+    <div id="controls">
+        <div class="button" id="leftButton">←</div>
+        <div class="button" id="upButton">↑</div>
+        <div class="button" id="downButton">↓</div>
+        <div class="button" id="rightButton">→</div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Player settings
+        let player = {
+            x: 50,
+            y: 50,
+            width: 40,
+            height: 40,
+            speed: 4,
+            sprite: new Image(),
+            direction: 'down'
+        };
+
+        player.sprite.src = 'https://raw.githubusercontent.com/BMarchet/spygame/main/assets/player.png'; // Zelda-like sprite
+
+        // Level design with simple obstacles (e.g., trees, rocks)
+        let obstacles = [
+            { x: 200, y: 100, width: 50, height: 50, type: 'rock' },
+            { x: 300, y: 200, width: 50, height: 50, type: 'tree' },
+            { x: 100, y: 300, width: 50, height: 50, type: 'tree' }
+        ];
+
+        // Puzzle element
+        let puzzle = {
+            x: 500,
+            y: 300,
+            width: 40,
+            height: 40,
+            color: 'green',
+            solved: false
+        };
+
+        let keys = {
+            right: false,
+            left: false,
+            up: false,
+            down: false
+        };
+
+        // Touch controls
+        let touchControls = {
+            left: false,
+            right: false,
+            up: false,
+            down: false
+        };
+
+        document.getElementById('leftButton').addEventListener('touchstart', () => touchControls.left = true);
+        document.getElementById('leftButton').addEventListener('touchend', () => touchControls.left = false);
+        document.getElementById('rightButton').addEventListener('touchstart', () => touchControls.right = true);
+        document.getElementById('rightButton').addEventListener('touchend', () => touchControls.right = false);
+        document.getElementById('upButton').addEventListener('touchstart', () => touchControls.up = true);
+        document.getElementById('upButton').addEventListener('touchend', () => touchControls.up = false);
+        document.getElementById('downButton').addEventListener('touchstart', () => touchControls.down = true);
+        document.getElementById('downButton').addEventListener('touchend', () => touchControls.down = false);
+
+        // Draw player
+        function drawPlayer() {
+            ctx.drawImage(player.sprite, player.x, player.y, player.width, player.height);
+        }
+
+        // Draw obstacles
+        function drawObstacles() {
+            ctx.fillStyle = 'gray';
+            obstacles.forEach(obstacle => {
+                ctx.fillRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
+            });
+        }
+
+        // Draw puzzle
+        function drawPuzzle() {
+            ctx.fillStyle = puzzle.solved ? 'gold' : puzzle.color;
+            ctx.fillRect(puzzle.x, puzzle.y, puzzle.width, puzzle.height);
+        }
+
+        // Check collision with obstacles
+        function checkCollisions() {
+            obstacles.forEach(obstacle => {
+                if (player.x < obstacle.x + obstacle.width &&
+                    player.x + player.width > obstacle.x &&
+                    player.y < obstacle.y + obstacle.height &&
+                    player.y + player.height > obstacle.y) {
+                    // Collision detected - stop movement
+                    if (keys.right || touchControls.right) player.x -= player.speed;
+                    if (keys.left || touchControls.left) player.x += player.speed;
+                    if (keys.up || touchControls.up) player.y += player.speed;
+                    if (keys.down || touchControls.down) player.y -= player.speed;
+                }
+            });
+        }
+
+        // Check if player solves puzzle
+        function checkPuzzle() {
+            if (
+                player.x < puzzle.x + puzzle.width &&
+                player.x + player.width > puzzle.x &&
+                player.y < puzzle.y + puzzle.height &&
+                player.y + player.height > puzzle.y
+            ) {
+                puzzle.solved = true;
+            }
+        }
+
+        // Move player
+        function movePlayer() {
+            if (keys.right || touchControls.right) player.x += player.speed;
+            if (keys.left || touchControls.left) player.x -= player.speed;
+            if (keys.up || touchControls.up) player.y -= player.speed;
+            if (keys.down || touchControls.down) player.y += player.speed;
+        }
+
+        // Game loop
+        function gameLoop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            movePlayer();
+            checkCollisions();
+            checkPuzzle();
+            drawPlayer();
+            drawObstacles();
+            drawPuzzle();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Keyboard controls
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight') keys.right = true;
+            if (e.key === 'ArrowLeft') keys.left = true;
+            if (e.key === 'ArrowUp') keys.up = true;
+            if (e.key === 'ArrowDown') keys.down = true;
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (e.key === 'ArrowRight') keys.right = false;
+            if (e.key === 'ArrowLeft') keys.left = false;
+            if (e.key === 'ArrowUp') keys.up = false;
+            if (e.key === 'ArrowDown') keys.down = false;
+        });
+
+        // Start game
+        gameLoop();
+    </script>
+</body>
+</html>
