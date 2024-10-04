@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stor 3D Interaktiv Solsikke</title>
+    <title>Stor 3D Interaktiv Solsikke med Vindbevægelse</title>
     <style>
         body, html {
             margin: 0;
@@ -64,7 +64,7 @@
             sunflower.add(center);
 
             // Kronblade (kun gule)
-            const petalCount = 40; // Øget antal kronblade for et fyldigere udseende
+            const petalCount = 40;
             const petalShape = new THREE.Shape();
             petalShape.moveTo(0, 0);
             petalShape.quadraticCurveTo(0.3, 0.5, 0, 2.5);
@@ -97,23 +97,27 @@
 
         function animate() {
             requestAnimationFrame(animate);
+            updateSunflower();
             renderer.render(scene, camera);
         }
 
-        function updateSunflower(volume, frequency) {
+        function updateSunflower() {
             if (sunflower) {
-                // Rotér hele solsikken baseret på lydstyrke
-                sunflower.rotation.z += volume * 0.05;
+                // Simuler vindbevægelse
+                const time = Date.now() * 0.001;
+                const windStrength = 0.1;
+                sunflower.rotation.x = Math.sin(time * 0.5) * 0.05 * windStrength;
+                sunflower.rotation.y = Math.cos(time * 0.3) * 0.05 * windStrength;
 
-                // Animér kronblade baseret på frekvens og lydstyrke
+                // Animér kronblade
                 for (let i = 1; i < sunflower.children.length; i++) {
                     const petal = sunflower.children[i];
-                    petal.rotation.z += Math.sin(Date.now() * 0.003 + i) * volume * 0.03;
-                    petal.position.z = Math.sin(Date.now() * 0.005 + i * 0.5) * volume * 0.2;
+                    petal.rotation.z += Math.sin(time * 2 + i) * 0.001;
+                    petal.position.z = Math.sin(time * 3 + i * 0.5) * 0.05;
                 }
 
                 // Subtil pulserende effekt på hele solsikken
-                const pulseScale = 1 + Math.sin(Date.now() * 0.005) * volume * 0.1;
+                const pulseScale = 1 + Math.sin(time * 2) * 0.02;
                 sunflower.scale.set(pulseScale * 1.5, pulseScale * 1.5, 1.5);
             }
         }
@@ -134,21 +138,16 @@
                 function getAudioData() {
                     analyser.getByteFrequencyData(dataArray);
                     let sum = 0;
-                    let maxIndex = 0;
                     for(let i = 0; i < bufferLength; i++) {
                         sum += dataArray[i];
-                        if (dataArray[i] > dataArray[maxIndex]) {
-                            maxIndex = i;
-                        }
                     }
-                    const volume = sum / bufferLength / 255; // Normaliseret til 0-1
-                    const frequency = maxIndex / bufferLength; // Normaliseret til 0-1
-                    return { volume, frequency };
+                    return sum / bufferLength / 255; // Normaliseret lydstyrke til 0-1
                 }
 
                 function animateAudio() {
-                    const { volume, frequency } = getAudioData();
-                    updateSunflower(volume, frequency);
+                    const volume = getAudioData();
+                    // Juster vindstyrken baseret på lydstyrke
+                    updateSunflower.windStrength = 0.1 + volume * 0.2;
                     requestAnimationFrame(animateAudio);
                 }
                 animateAudio();
