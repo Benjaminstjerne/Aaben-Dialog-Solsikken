@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Interaktiv Solsikke</title>
+    <title>3D Interaktiv Solsikke</title>
     <style>
         body, html {
             margin: 0;
@@ -12,100 +12,120 @@
             height: 100%;
             overflow: hidden;
         }
-        #canvas {
-            display: block;
+        #scene-container {
             width: 100%;
             height: 100%;
-            background-color: skyblue;
         }
     </style>
 </head>
 <body>
-    <canvas id="canvas"></canvas>
+    <div id="scene-container"></div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script>
-        const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
-        let width, height;
+        let scene, camera, renderer, sunflower;
         let isFullscreen = false;
 
-        function resizeCanvas() {
-            width = window.innerWidth;
-            height = window.innerHeight;
-            canvas.width = width;
-            canvas.height = height;
+        function init() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setClearColor(0x87CEEB); // Himmelblå baggrundsfarve
+            document.getElementById('scene-container').appendChild(renderer.domElement);
+
+            // Lys
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+            scene.add(ambientLight);
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(5, 5, 5);
+            scene.add(directionalLight);
+
+            createSunflower();
+
+            camera.position.z = 5;
+
+            window.addEventListener('resize', onWindowResize, false);
+
+            animate();
         }
 
-        window.addEventListener('resize', resizeCanvas);
-        resizeCanvas();
+        function createSunflower() {
+            sunflower = new THREE.Group();
 
-        // Solsikke klasse
-        class Sunflower {
-            constructor() {
-                this.x = width / 2;
-                this.y = height - 100;
-                this.stemHeight = height / 2;
-                this.flowerSize = 100;
-                this.petalCount = 20;
-                this.angle = 0;
+            // Stilk
+            const stemGeometry = new THREE.CylinderGeometry(0.05, 0.05, 3, 32);
+            const stemMaterial = new THREE.MeshPhongMaterial({ color: 0x228B22 });
+            const stem = new THREE.Mesh(stemGeometry, stemMaterial);
+            stem.position.y = -1.5;
+            sunflower.add(stem);
+
+            // Blade
+            const leafGeometry = new THREE.SphereGeometry(0.3, 32, 32);
+            leafGeometry.scale(1, 0.3, 0.5);
+            const leafMaterial = new THREE.MeshPhongMaterial({ color: 0x32CD32 });
+            const leaf1 = new THREE.Mesh(leafGeometry, leafMaterial);
+            leaf1.position.set(0.3, -0.5, 0);
+            leaf1.rotation.z = Math.PI / 4;
+            sunflower.add(leaf1);
+            const leaf2 = leaf1.clone();
+            leaf2.position.set(-0.3, 0, 0);
+            leaf2.rotation.z = -Math.PI / 4;
+            sunflower.add(leaf2);
+
+            // Blomsterhoved
+            const flowerHead = new THREE.Group();
+            
+            // Centrum
+            const centerGeometry = new THREE.SphereGeometry(0.3, 32, 32);
+            const centerMaterial = new THREE.MeshPhongMaterial({ color: 0x8B4513 });
+            const center = new THREE.Mesh(centerGeometry, centerMaterial);
+            flowerHead.add(center);
+
+            // Kronblade
+            const petalGeometry = new THREE.SphereGeometry(0.4, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2);
+            const petalMaterial = new THREE.MeshPhongMaterial({ color: 0xFFFF00, side: THREE.DoubleSide });
+            for (let i = 0; i < 24; i++) {
+                const petal = new THREE.Mesh(petalGeometry, petalMaterial);
+                petal.position.y = 0.05;
+                petal.rotation.z = (i / 24) * Math.PI * 2;
+                petal.rotation.y = Math.PI / 2;
+                flowerHead.add(petal);
             }
 
-            draw() {
-                // Tegn stilk
-                ctx.beginPath();
-                ctx.moveTo(this.x, this.y);
-                ctx.lineTo(this.x, this.y - this.stemHeight);
-                ctx.strokeStyle = 'green';
-                ctx.lineWidth = 10;
-                ctx.stroke();
+            flowerHead.position.y = 1.5;
+            sunflower.add(flowerHead);
 
-                // Tegn blade
-                this.drawLeaf(this.x, this.y - this.stemHeight * 0.3, -30);
-                this.drawLeaf(this.x, this.y - this.stemHeight * 0.6, 30);
+            scene.add(sunflower);
+        }
 
-                // Tegn blomst
-                ctx.save();
-                ctx.translate(this.x, this.y - this.stemHeight);
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
 
-                // Rotér blomsten
-                ctx.rotate(this.angle);
+        function animate() {
+            requestAnimationFrame(animate);
+            renderer.render(scene, camera);
+        }
 
-                // Tegn kronblade
-                for (let i = 0; i < this.petalCount; i++) {
-                    ctx.fillStyle = 'yellow';
-                    ctx.beginPath();
-                    ctx.moveTo(0, 0);
-                    ctx.arc(0, 0, this.flowerSize, (i / this.petalCount) * Math.PI * 2, ((i + 1) / this.petalCount) * Math.PI * 2);
-                    ctx.fill();
-                }
-
-                // Tegn centrum
-                ctx.fillStyle = 'brown';
-                ctx.beginPath();
-                ctx.arc(0, 0, this.flowerSize * 0.3, 0, Math.PI * 2);
-                ctx.fill();
-
-                ctx.restore();
-            }
-
-            drawLeaf(x, y, angle) {
-                ctx.save();
-                ctx.translate(x, y);
-                ctx.rotate(angle * Math.PI / 180);
-                ctx.fillStyle = 'green';
-                ctx.beginPath();
-                ctx.ellipse(0, 0, 40, 15, 0, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.restore();
-            }
-
-            update(volume) {
-                this.angle += volume * 0.1;
-                this.flowerSize = 100 + volume * 50;
+        function updateSunflower(volume) {
+            if (sunflower) {
+                // Rotér blomsterhovedet baseret på lydstyrke
+                sunflower.children[3].rotation.y += volume * 0.05;
+                
+                // Skalér blomsten baseret på lydstyrke
+                const scale = 1 + volume * 0.5;
+                sunflower.children[3].scale.set(scale, scale, scale);
+                
+                // Bevæg bladene baseret på lydstyrke
+                sunflower.children[1].rotation.z = Math.PI / 4 + Math.sin(Date.now() * 0.005) * volume * 0.2;
+                sunflower.children[2].rotation.z = -Math.PI / 4 + Math.sin(Date.now() * 0.005) * volume * 0.2;
             }
         }
 
-        const sunflower = new Sunflower();
+        init();
 
         // Lydinput
         navigator.mediaDevices.getUserMedia({ audio: true, video: false })
@@ -127,14 +147,12 @@
                     return sum / bufferLength;
                 }
 
-                function animate() {
-                    ctx.clearRect(0, 0, width, height);
-                    const volume = getVolume();
-                    sunflower.update(volume / 128);  // Normalisér volumen til 0-1
-                    sunflower.draw();
-                    requestAnimationFrame(animate);
+                function animateAudio() {
+                    const volume = getVolume() / 128;  // Normalisér volumen til 0-1
+                    updateSunflower(volume);
+                    requestAnimationFrame(animateAudio);
                 }
-                animate();
+                animateAudio();
             })
             .catch(function(err) {
                 console.error('Fejl ved adgang til mikrofon:', err);
