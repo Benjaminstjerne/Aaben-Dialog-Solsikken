@@ -7,21 +7,12 @@
     <style>
         body { margin: 0; overflow: hidden; }
         canvas { display: block; }
-        #info {
-            position: absolute;
-            top: 10px;
-            width: 100%;
-            text-align: center;
-            color: white;
-            font-family: Arial, sans-serif;
-        }
     </style>
 </head>
 <body>
-    <div id="info">Tryk for fuldskærm<br>Tal for at interagere</div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script>
-        let scene, camera, renderer, creature;
+        let scene, camera, renderer, creature, particles;
         let audioContext, analyser;
         let isFullscreen = false;
 
@@ -32,25 +23,32 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.body.appendChild(renderer.domElement);
 
-            const geometry = new THREE.IcosahedronGeometry(1, 2);
-            const material = new THREE.MeshPhongMaterial({ 
-                color: 0xffffff,
-                wireframe: true,
-                emissive: 0x111111,
-                specular: 0xffffff,
-                shininess: 100
-            });
+            // Creature
+            const geometry = new THREE.TorusKnotGeometry(1, 0.3, 100, 16);
+            const material = new THREE.MeshNormalMaterial();
             creature = new THREE.Mesh(geometry, material);
             scene.add(creature);
 
-            const light = new THREE.PointLight(0xffffff, 1, 100);
-            light.position.set(0, 0, 10);
-            scene.add(light);
+            // Particles
+            const particlesGeometry = new THREE.BufferGeometry();
+            const particlesCnt = 5000;
+            const posArray = new Float32Array(particlesCnt * 3);
+            for(let i = 0; i < particlesCnt * 3; i++) {
+                posArray[i] = (Math.random() - 0.5) * 5;
+            }
+            particlesGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+            const particlesMaterial = new THREE.PointsMaterial({
+                size: 0.005,
+                color: 0xffffff
+            });
+            particles = new THREE.Points(particlesGeometry, particlesMaterial);
+            scene.add(particles);
 
-            camera.position.z = 5;
+            camera.position.z = 3;
 
             audioContext = new (window.AudioContext || window.webkitAudioContext)();
             analyser = audioContext.createAnalyser();
+            analyser.fftSize = 256;
 
             navigator.mediaDevices.getUserMedia({ audio: true })
                 .then(stream => {
@@ -71,31 +69,41 @@
             const dataArray = new Uint8Array(analyser.frequencyBinCount);
             analyser.getByteFrequencyData(dataArray);
 
-            const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
-            const scale = 1 + average / 128;
-            creature.scale.setScalar(scale);
+            const lowerHalfArray = dataArray.slice(0, (dataArray.length/2) - 1);
+            const upperHalfArray = dataArray.slice((dataArray.length/2) - 1, dataArray.length - 1);
 
-            const hue = average / 255;
-            creature.material.color.setHSL(hue, 1, 0.5);
-            creature.material.emissive.setHSL(hue, 1, 0.2);
+            const lowerAvg = lowerHalfArray.reduce((a,b) => a + b) / lowerHalfArray.length;
+            const upperAvg = upperHalfArray.reduce((a,b) => a + b) / upperHalfArray.length;
 
+            const lowerScale = 1 + (lowerAvg / 128);
+            const upperScale = 1 + (upperAvg / 128);
+
+            creature.scale.set(lowerScale, upperScale, (lowerScale + upperScale) / 2);
             creature.rotation.x += 0.01;
             creature.rotation.y += 0.01;
+
+            particles.rotation.x = lowerAvg * 0.01;
+            particles.rotation.y = upperAvg * 0.01;
+
+            const positions = particles.geometry.attributes.position.array;
+            for(let i = 0; i < positions.length; i += 3) {
+                positions[i] += Math.sin(Date.now() * 0.001 + i) * 0.001;
+                positions[i+1] += Math.cos(Date.now() * 0.002 + i) * 0.001;
+                positions[i+2] += Math.sin(Date.now() * 0.003 + i) * 0.001;
+            }
+            particles.geometry.attributes.position.needsUpdate = true;
 
             renderer.render(scene, camera);
         }
 
         function toggleFullscreen() {
-            if (!isFullscreen) {
-                if (document.documentElement.requestFullscreen) {
-                    document.documentElement.requestFullscreen();
-                }
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
             } else {
                 if (document.exitFullscreen) {
                     document.exitFullscreen();
                 }
             }
-            isFullscreen = !isFullscreen;
         }
 
         function onWindowResize() {
