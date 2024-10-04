@@ -3,148 +3,108 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vandbølgesimulation</title>
+    <title>ÅbenDialogVæsen</title>
     <style>
-        body, html {
-            margin: 0;
-            padding: 0;
-            height: 100%;
-            overflow: hidden;
-            background-color: black;
-        }
-        canvas {
-            display: block;
+        body { margin: 0; overflow: hidden; }
+        canvas { display: block; }
+        #info {
+            position: absolute;
+            top: 10px;
             width: 100%;
-            height: 100%;
-            cursor: pointer;
+            text-align: center;
+            color: white;
+            font-family: Arial, sans-serif;
         }
     </style>
 </head>
 <body>
-    <canvas id="canvas"></canvas>
-
+    <div id="info">Tryk for fuldskærm<br>Tal for at interagere</div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script>
-        const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
+        let scene, camera, renderer, creature;
         let audioContext, analyser;
-        let lastTime = 0;
+        let isFullscreen = false;
 
-        const resolution = 4;
-        let cols, rows;
-        let current, previous;
+        function init() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
 
-        function resizeCanvas() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-            cols = Math.floor(canvas.width / resolution);
-            rows = Math.floor(canvas.height / resolution);
-            current = new Array(cols).fill().map(() => new Array(rows).fill(0));
-            previous = new Array(cols).fill().map(() => new Array(rows).fill(0));
+            const geometry = new THREE.IcosahedronGeometry(1, 2);
+            const material = new THREE.MeshPhongMaterial({ 
+                color: 0xffffff,
+                wireframe: true,
+                emissive: 0x111111,
+                specular: 0xffffff,
+                shininess: 100
+            });
+            creature = new THREE.Mesh(geometry, material);
+            scene.add(creature);
+
+            const light = new THREE.PointLight(0xffffff, 1, 100);
+            light.position.set(0, 0, 10);
+            scene.add(light);
+
+            camera.position.z = 5;
+
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            analyser = audioContext.createAnalyser();
+
+            navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(stream => {
+                    const source = audioContext.createMediaStreamSource(stream);
+                    source.connect(analyser);
+                })
+                .catch(err => console.error('Mikrofonadgang nægtet:', err));
+
+            document.addEventListener('click', toggleFullscreen);
+            window.addEventListener('resize', onWindowResize, false);
+
+            animate();
         }
 
-        async function setupAudio() {
-            try {
-                audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                analyser = audioContext.createAnalyser();
-                analyser.fftSize = 256;
+        function animate() {
+            requestAnimationFrame(animate);
 
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                const source = audioContext.createMediaStreamSource(stream);
-                source.connect(analyser);
-            } catch (err) {
-                console.error('Mikrofon adgang nægtet:', err);
-            }
-        }
+            const dataArray = new Uint8Array(analyser.frequencyBinCount);
+            analyser.getByteFrequencyData(dataArray);
 
-        function createRipple(x, y, strength) {
-            const colIndex = Math.floor(x / resolution);
-            const rowIndex = Math.floor(y / resolution);
-            if (colIndex >= 0 && colIndex < cols && rowIndex >= 0 && rowIndex < rows) {
-                previous[colIndex][rowIndex] = strength * 2; // Øget styrke
-            }
-        }
+            const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
+            const scale = 1 + average / 128;
+            creature.scale.setScalar(scale);
 
-        function updateWater() {
-            for (let i = 1; i < cols - 1; i++) {
-                for (let j = 1; j < rows - 1; j++) {
-                    current[i][j] = (
-                        previous[i-1][j] +
-                        previous[i+1][j] +
-                        previous[i][j-1] +
-                        previous[i][j+1]
-                    ) / 2 - current[i][j];
-                    current[i][j] *= 0.99; // damping
-                }
-            }
+            const hue = average / 255;
+            creature.material.color.setHSL(hue, 1, 0.5);
+            creature.material.emissive.setHSL(hue, 1, 0.2);
 
-            [current, previous] = [previous, current];
-        }
+            creature.rotation.x += 0.01;
+            creature.rotation.y += 0.01;
 
-        function drawWater(currentTime) {
-            const deltaTime = Math.min((currentTime - lastTime) / 16, 2);
-            lastTime = currentTime;
-
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            if (analyser) {
-                const dataArray = new Uint8Array(analyser.frequencyBinCount);
-                analyser.getByteFrequencyData(dataArray);
-
-                const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
-                if (average > 30) {
-                    const x = Math.random() * canvas.width;
-                    const y = Math.random() * canvas.height;
-                    createRipple(x, y, average / 5);
-                }
-            }
-
-            updateWater();
-
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-            ctx.lineWidth = 1;
-
-            for (let i = 0; i < cols; i++) {
-                for (let j = 0; j < rows; j++) {
-                    const x = i * resolution;
-                    const y = j * resolution;
-                    const height = current[i][j];
-                    
-                    ctx.fillStyle = `rgba(255, 255, 255, ${Math.min(Math.abs(height) * 0.4, 1)})`; // Øget intensitet, maks 1
-                    ctx.fillRect(x, y, resolution, resolution);
-
-                    if (i > 0 && j > 0) {
-                        ctx.beginPath();
-                        ctx.moveTo(x, y);
-                        ctx.lineTo(x - resolution, y - resolution);
-                        ctx.globalAlpha = Math.min(Math.abs(height), 1); // Øget intensitet, maks 1
-                        ctx.stroke();
-                    }
-                }
-            }
-
-            ctx.globalAlpha = 1;
-            requestAnimationFrame(drawWater);
+            renderer.render(scene, camera);
         }
 
         function toggleFullscreen() {
-            if (!document.fullscreenElement) {
-                canvas.requestFullscreen().catch(err => {
-                    console.error(`Fejl ved overgang til fuldskærm: ${err.message}`);
-                });
+            if (!isFullscreen) {
+                if (document.documentElement.requestFullscreen) {
+                    document.documentElement.requestFullscreen();
+                }
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                }
             }
+            isFullscreen = !isFullscreen;
         }
 
-        canvas.addEventListener('click', (event) => {
-            createRipple(event.clientX, event.clientY, 10); // Øget styrke for klik
-            if (!audioContext) setupAudio();
-            toggleFullscreen();
-        });
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
 
-        window.addEventListener('resize', resizeCanvas);
-
-        resizeCanvas();
-        requestAnimationFrame(drawWater);
+        init();
     </script>
 </body>
 </html>
