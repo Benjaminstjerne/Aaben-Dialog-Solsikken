@@ -13,7 +13,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script>
         let scene, camera, renderer, creature, particles;
-        let audioContext, analyser;
+        let audioContext, analyser, dataArray;
         let isFullscreen = false;
 
         function init() {
@@ -49,6 +49,7 @@
             audioContext = new (window.AudioContext || window.webkitAudioContext)();
             analyser = audioContext.createAnalyser();
             analyser.fftSize = 256;
+            dataArray = new Uint8Array(analyser.frequencyBinCount);
 
             navigator.mediaDevices.getUserMedia({ audio: true })
                 .then(stream => {
@@ -66,7 +67,6 @@
         function animate() {
             requestAnimationFrame(animate);
 
-            const dataArray = new Uint8Array(analyser.frequencyBinCount);
             analyser.getByteFrequencyData(dataArray);
 
             const lowerHalfArray = dataArray.slice(0, (dataArray.length/2) - 1);
@@ -75,21 +75,22 @@
             const lowerAvg = lowerHalfArray.reduce((a,b) => a + b) / lowerHalfArray.length;
             const upperAvg = upperHalfArray.reduce((a,b) => a + b) / upperHalfArray.length;
 
-            const lowerScale = 1 + (lowerAvg / 128);
-            const upperScale = 1 + (upperAvg / 128);
+            // Dramatically increase the scale effect
+            const lowerScale = 1 + (lowerAvg / 25);  // Increased from 128 to 25
+            const upperScale = 1 + (upperAvg / 25);  // Increased from 128 to 25
 
             creature.scale.set(lowerScale, upperScale, (lowerScale + upperScale) / 2);
-            creature.rotation.x += 0.01;
-            creature.rotation.y += 0.01;
+            creature.rotation.x += 0.01 + (lowerAvg * 0.01);
+            creature.rotation.y += 0.01 + (upperAvg * 0.01);
 
-            particles.rotation.x = lowerAvg * 0.01;
-            particles.rotation.y = upperAvg * 0.01;
+            particles.rotation.x = lowerAvg * 0.05;  // Increased from 0.01 to 0.05
+            particles.rotation.y = upperAvg * 0.05;  // Increased from 0.01 to 0.05
 
             const positions = particles.geometry.attributes.position.array;
             for(let i = 0; i < positions.length; i += 3) {
-                positions[i] += Math.sin(Date.now() * 0.001 + i) * 0.001;
-                positions[i+1] += Math.cos(Date.now() * 0.002 + i) * 0.001;
-                positions[i+2] += Math.sin(Date.now() * 0.003 + i) * 0.001;
+                positions[i] += Math.sin(Date.now() * 0.001 + i) * 0.01 * (lowerAvg / 128);
+                positions[i+1] += Math.cos(Date.now() * 0.002 + i) * 0.01 * (upperAvg / 128);
+                positions[i+2] += Math.sin(Date.now() * 0.003 + i) * 0.01;
             }
             particles.geometry.attributes.position.needsUpdate = true;
 
