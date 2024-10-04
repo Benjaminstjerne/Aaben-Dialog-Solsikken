@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Realistisk 3D Interaktiv Solsikke</title>
+    <title>Stor 3D Interaktiv Solsikke</title>
     <style>
         body, html {
             margin: 0;
@@ -31,7 +31,7 @@
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.setClearColor(0x87CEEB); // Lyseblå himmel baggrund
+            renderer.setClearColor(0x000000); // Sort baggrund
             document.getElementById('scene-container').appendChild(renderer.domElement);
 
             // Lys
@@ -41,33 +41,34 @@
             directionalLight.position.set(5, 5, 5);
             scene.add(directionalLight);
 
-            createRealisticSunflower();
+            createLargeSunflower();
 
-            camera.position.z = 7; // Flyttet kameraet lidt længere væk
+            camera.position.z = 6; // Justeret for at passe til den større solsikke
 
             window.addEventListener('resize', onWindowResize, false);
 
             animate();
         }
 
-        function createRealisticSunflower() {
+        function createLargeSunflower() {
             sunflower = new THREE.Group();
 
             // Solsikkens centrum (fladere og mørkebrun)
-            const centerGeometry = new THREE.CircleGeometry(1, 32);
+            const centerGeometry = new THREE.CircleGeometry(1.2, 64);
             const centerMaterial = new THREE.MeshPhongMaterial({
                 color: 0x3E2723, // Mørkebrun
                 side: THREE.DoubleSide
             });
             const center = new THREE.Mesh(centerGeometry, centerMaterial);
+            center.position.z = 0.01; // Let forskydning for at undgå z-fighting
             sunflower.add(center);
 
             // Kronblade (kun gule)
-            const petalCount = 32; // Øget antal kronblade
+            const petalCount = 40; // Øget antal kronblade for et fyldigere udseende
             const petalShape = new THREE.Shape();
             petalShape.moveTo(0, 0);
-            petalShape.quadraticCurveTo(0.2, 0.3, 0, 1.5);
-            petalShape.quadraticCurveTo(-0.2, 0.3, 0, 0);
+            petalShape.quadraticCurveTo(0.3, 0.5, 0, 2.5);
+            petalShape.quadraticCurveTo(-0.3, 0.5, 0, 0);
             const petalGeometry = new THREE.ShapeGeometry(petalShape);
             const petalMaterial = new THREE.MeshPhongMaterial({
                 color: 0xFFD700, // Rent gul
@@ -77,12 +78,12 @@
             for (let i = 0; i < petalCount; i++) {
                 const petal = new THREE.Mesh(petalGeometry, petalMaterial);
                 const angle = (i / petalCount) * Math.PI * 2;
-                petal.position.set(Math.cos(angle) * 1, Math.sin(angle) * 1, 0.1);
+                petal.position.set(Math.cos(angle) * 1.2, Math.sin(angle) * 1.2, 0);
                 petal.rotation.z = angle;
                 sunflower.add(petal);
             }
 
-            // Gør hele solsikken større
+            // Gør solsikken større
             sunflower.scale.set(1.5, 1.5, 1.5);
 
             scene.add(sunflower);
@@ -104,10 +105,6 @@
                 // Rotér hele solsikken baseret på lydstyrke
                 sunflower.rotation.z += volume * 0.05;
 
-                // Pulsér centrum let baseret på lydstyrke
-                const centerScale = 1 + volume * 0.1;
-                sunflower.children[0].scale.set(centerScale, centerScale, 1);
-
                 // Animér kronblade baseret på frekvens og lydstyrke
                 for (let i = 1; i < sunflower.children.length; i++) {
                     const petal = sunflower.children[i];
@@ -115,11 +112,9 @@
                     petal.position.z = Math.sin(Date.now() * 0.005 + i * 0.5) * volume * 0.2;
                 }
 
-                // Rotér kameraet let omkring solsikken
-                const cameraAngle = Date.now() * 0.0003;
-                camera.position.x = Math.sin(cameraAngle) * 7;
-                camera.position.z = Math.cos(cameraAngle) * 7;
-                camera.lookAt(scene.position);
+                // Subtil pulserende effekt på hele solsikken
+                const pulseScale = 1 + Math.sin(Date.now() * 0.005) * volume * 0.1;
+                sunflower.scale.set(pulseScale * 1.5, pulseScale * 1.5, 1.5);
             }
         }
 
