@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stor 3D Interaktiv Solsikke med Vindbevægelse</title>
+    <title>Stor 3D Interaktiv Solsikke Reagerende på Lyd</title>
     <style>
         body, html {
             margin: 0;
@@ -25,6 +25,7 @@
     <script>
         let scene, camera, renderer, sunflower;
         let isFullscreen = false;
+        let audioVolume = 0;
 
         function init() {
             scene = new THREE.Scene();
@@ -34,7 +35,6 @@
             renderer.setClearColor(0x000000); // Sort baggrund
             document.getElementById('scene-container').appendChild(renderer.domElement);
 
-            // Lys
             const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
             scene.add(ambientLight);
             const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
@@ -43,7 +43,7 @@
 
             createLargeSunflower();
 
-            camera.position.z = 6; // Justeret for at passe til den større solsikke
+            camera.position.z = 6;
 
             window.addEventListener('resize', onWindowResize, false);
 
@@ -53,17 +53,15 @@
         function createLargeSunflower() {
             sunflower = new THREE.Group();
 
-            // Solsikkens centrum (fladere og mørkebrun)
             const centerGeometry = new THREE.CircleGeometry(1.2, 64);
             const centerMaterial = new THREE.MeshPhongMaterial({
-                color: 0x3E2723, // Mørkebrun
+                color: 0x3E2723,
                 side: THREE.DoubleSide
             });
             const center = new THREE.Mesh(centerGeometry, centerMaterial);
-            center.position.z = 0.01; // Let forskydning for at undgå z-fighting
+            center.position.z = 0.01;
             sunflower.add(center);
 
-            // Kronblade (kun gule)
             const petalCount = 40;
             const petalShape = new THREE.Shape();
             petalShape.moveTo(0, 0);
@@ -71,7 +69,7 @@
             petalShape.quadraticCurveTo(-0.3, 0.5, 0, 0);
             const petalGeometry = new THREE.ShapeGeometry(petalShape);
             const petalMaterial = new THREE.MeshPhongMaterial({
-                color: 0xFFD700, // Rent gul
+                color: 0xFFD700,
                 side: THREE.DoubleSide
             });
 
@@ -83,7 +81,6 @@
                 sunflower.add(petal);
             }
 
-            // Gør solsikken større
             sunflower.scale.set(1.5, 1.5, 1.5);
 
             scene.add(sunflower);
@@ -103,22 +100,34 @@
 
         function updateSunflower() {
             if (sunflower) {
-                // Simuler vindbevægelse
                 const time = Date.now() * 0.001;
-                const windStrength = 0.1;
+                const windStrength = 0.1 + audioVolume * 0.5;
+
+                // Kombinér vindbevægelse med lydrespons
                 sunflower.rotation.x = Math.sin(time * 0.5) * 0.05 * windStrength;
                 sunflower.rotation.y = Math.cos(time * 0.3) * 0.05 * windStrength;
 
-                // Animér kronblade
+                // Rotér hele solsikken baseret på lydstyrke
+                sunflower.rotation.z += audioVolume * 0.1;
+
+                // Animér kronblade med øget lydfølsomhed
                 for (let i = 1; i < sunflower.children.length; i++) {
                     const petal = sunflower.children[i];
-                    petal.rotation.z += Math.sin(time * 2 + i) * 0.001;
-                    petal.position.z = Math.sin(time * 3 + i * 0.5) * 0.05;
+                    petal.rotation.z += Math.sin(time * 2 + i) * 0.002 * (1 + audioVolume * 2);
+                    petal.position.z = Math.sin(time * 3 + i * 0.5) * 0.05 * (1 + audioVolume * 3);
                 }
 
-                // Subtil pulserende effekt på hele solsikken
-                const pulseScale = 1 + Math.sin(time * 2) * 0.02;
+                // Pulserende effekt påvirket af lyd
+                const pulseScale = 1 + Math.sin(time * 2) * 0.02 + audioVolume * 0.1;
                 sunflower.scale.set(pulseScale * 1.5, pulseScale * 1.5, 1.5);
+
+                // Farveændring baseret på lydstyrke
+                const hue = THREE.MathUtils.lerp(0.1, 0.2, audioVolume); // Gul til orange
+                sunflower.children.forEach((child, index) => {
+                    if (index !== 0) { // Undgå at ændre farven på centrum
+                        child.material.color.setHSL(hue, 1, 0.5);
+                    }
+                });
             }
         }
 
@@ -141,16 +150,14 @@
                     for(let i = 0; i < bufferLength; i++) {
                         sum += dataArray[i];
                     }
-                    return sum / bufferLength / 255; // Normaliseret lydstyrke til 0-1
+                    return sum / bufferLength / 255;
                 }
 
-                function animateAudio() {
-                    const volume = getAudioData();
-                    // Juster vindstyrken baseret på lydstyrke
-                    updateSunflower.windStrength = 0.1 + volume * 0.2;
-                    requestAnimationFrame(animateAudio);
+                function updateAudio() {
+                    audioVolume = getAudioData();
+                    requestAnimationFrame(updateAudio);
                 }
-                animateAudio();
+                updateAudio();
             })
             .catch(function(err) {
                 console.error('Fejl ved adgang til mikrofon:', err);
