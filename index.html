@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Interaktiv Solsikke</title>
+    <title>Abstrakt 3D Interaktiv Solsikke</title>
     <style>
         body, html {
             margin: 0;
@@ -31,7 +31,7 @@
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.setClearColor(0x87CEEB); // Himmelblå baggrundsfarve
+            renderer.setClearColor(0x000000); // Sort baggrund for kontrast
             document.getElementById('scene-container').appendChild(renderer.domElement);
 
             // Lys
@@ -41,7 +41,7 @@
             directionalLight.position.set(5, 5, 5);
             scene.add(directionalLight);
 
-            createSunflower();
+            createAbstractSunflower();
 
             camera.position.z = 5;
 
@@ -50,51 +50,43 @@
             animate();
         }
 
-        function createSunflower() {
+        function createAbstractSunflower() {
             sunflower = new THREE.Group();
 
-            // Stilk
-            const stemGeometry = new THREE.CylinderGeometry(0.05, 0.05, 3, 32);
-            const stemMaterial = new THREE.MeshPhongMaterial({ color: 0x228B22 });
-            const stem = new THREE.Mesh(stemGeometry, stemMaterial);
-            stem.position.y = -1.5;
-            sunflower.add(stem);
-
-            // Blade
-            const leafGeometry = new THREE.SphereGeometry(0.3, 32, 32);
-            leafGeometry.scale(1, 0.3, 0.5);
-            const leafMaterial = new THREE.MeshPhongMaterial({ color: 0x32CD32 });
-            const leaf1 = new THREE.Mesh(leafGeometry, leafMaterial);
-            leaf1.position.set(0.3, -0.5, 0);
-            leaf1.rotation.z = Math.PI / 4;
-            sunflower.add(leaf1);
-            const leaf2 = leaf1.clone();
-            leaf2.position.set(-0.3, 0, 0);
-            leaf2.rotation.z = -Math.PI / 4;
-            sunflower.add(leaf2);
-
-            // Blomsterhoved
-            const flowerHead = new THREE.Group();
-            
-            // Centrum
-            const centerGeometry = new THREE.SphereGeometry(0.3, 32, 32);
-            const centerMaterial = new THREE.MeshPhongMaterial({ color: 0x8B4513 });
+            // Solsikkens centrum
+            const centerGeometry = new THREE.SphereGeometry(0.5, 32, 32);
+            const centerMaterial = new THREE.MeshPhongMaterial({
+                color: 0x8B4513,
+                emissive: 0x4A2006,
+                specular: 0xFFD700,
+                shininess: 30
+            });
             const center = new THREE.Mesh(centerGeometry, centerMaterial);
-            flowerHead.add(center);
+            sunflower.add(center);
 
             // Kronblade
-            const petalGeometry = new THREE.SphereGeometry(0.4, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2);
-            const petalMaterial = new THREE.MeshPhongMaterial({ color: 0xFFFF00, side: THREE.DoubleSide });
-            for (let i = 0; i < 24; i++) {
-                const petal = new THREE.Mesh(petalGeometry, petalMaterial);
-                petal.position.y = 0.05;
-                petal.rotation.z = (i / 24) * Math.PI * 2;
-                petal.rotation.y = Math.PI / 2;
-                flowerHead.add(petal);
-            }
+            const petalCount = 24;
+            const petalShape = new THREE.Shape();
+            petalShape.moveTo(0, 0);
+            petalShape.quadraticCurveTo(0.1, 0.2, 0, 0.8);
+            petalShape.quadraticCurveTo(-0.1, 0.2, 0, 0);
+            const petalGeometry = new THREE.ShapeGeometry(petalShape);
+            const petalMaterial = new THREE.MeshPhongMaterial({
+                color: 0xFFFF00,
+                emissive: 0x808000,
+                specular: 0xFFFFFF,
+                shininess: 100,
+                side: THREE.DoubleSide
+            });
 
-            flowerHead.position.y = 1.5;
-            sunflower.add(flowerHead);
+            for (let i = 0; i < petalCount; i++) {
+                const petal = new THREE.Mesh(petalGeometry, petalMaterial);
+                const angle = (i / petalCount) * Math.PI * 2;
+                petal.position.set(Math.cos(angle) * 0.5, Math.sin(angle) * 0.5, 0);
+                petal.rotation.z = angle;
+                petal.scale.set(1, 2, 1);
+                sunflower.add(petal);
+            }
 
             scene.add(sunflower);
         }
@@ -110,18 +102,28 @@
             renderer.render(scene, camera);
         }
 
-        function updateSunflower(volume) {
+        function updateSunflower(volume, frequency) {
             if (sunflower) {
-                // Rotér blomsterhovedet baseret på lydstyrke
-                sunflower.children[3].rotation.y += volume * 0.05;
-                
-                // Skalér blomsten baseret på lydstyrke
-                const scale = 1 + volume * 0.5;
-                sunflower.children[3].scale.set(scale, scale, scale);
-                
-                // Bevæg bladene baseret på lydstyrke
-                sunflower.children[1].rotation.z = Math.PI / 4 + Math.sin(Date.now() * 0.005) * volume * 0.2;
-                sunflower.children[2].rotation.z = -Math.PI / 4 + Math.sin(Date.now() * 0.005) * volume * 0.2;
+                // Rotér hele solsikken baseret på lydstyrke
+                sunflower.rotation.z += volume * 0.05;
+
+                // Pulsér centrum baseret på lydstyrke
+                const centerScale = 1 + volume * 0.3;
+                sunflower.children[0].scale.set(centerScale, centerScale, centerScale);
+
+                // Animér kronblade baseret på frekvens og lydstyrke
+                for (let i = 1; i < sunflower.children.length; i++) {
+                    const petal = sunflower.children[i];
+                    petal.rotation.z += Math.sin(Date.now() * 0.005 + i) * volume * 0.05;
+                    petal.scale.y = 2 + Math.sin(Date.now() * 0.01 + i * 0.5) * volume * 0.5;
+                    petal.material.emissive.setHSL(frequency, 1, 0.5);
+                }
+
+                // Rotér kameraet let omkring solsikken
+                const cameraAngle = Date.now() * 0.0005;
+                camera.position.x = Math.sin(cameraAngle) * 5;
+                camera.position.z = Math.cos(cameraAngle) * 5;
+                camera.lookAt(scene.position);
             }
         }
 
@@ -138,18 +140,24 @@
                 const bufferLength = analyser.frequencyBinCount;
                 const dataArray = new Uint8Array(bufferLength);
 
-                function getVolume() {
+                function getAudioData() {
                     analyser.getByteFrequencyData(dataArray);
                     let sum = 0;
+                    let maxIndex = 0;
                     for(let i = 0; i < bufferLength; i++) {
                         sum += dataArray[i];
+                        if (dataArray[i] > dataArray[maxIndex]) {
+                            maxIndex = i;
+                        }
                     }
-                    return sum / bufferLength;
+                    const volume = sum / bufferLength / 255; // Normaliseret til 0-1
+                    const frequency = maxIndex / bufferLength; // Normaliseret til 0-1
+                    return { volume, frequency };
                 }
 
                 function animateAudio() {
-                    const volume = getVolume() / 128;  // Normalisér volumen til 0-1
-                    updateSunflower(volume);
+                    const { volume, frequency } = getAudioData();
+                    updateSunflower(volume, frequency);
                     requestAnimationFrame(animateAudio);
                 }
                 animateAudio();
